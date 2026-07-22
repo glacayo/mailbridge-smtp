@@ -3,7 +3,7 @@
  * SMTP Tester Class
  * Handles .env parsing, SMTP connection testing, and result formatting.
  *
- * @package RMS_SMTP_CF7_Tests
+ * @package MailBridge_SMTP_Tests
  */
 
 class SmtpTester
@@ -14,10 +14,11 @@ class SmtpTester
     private int $timeout = 10;
     private bool $verbose = false;
 
-    public function __construct(string $envFile, string $resultsDir)
+    public function __construct(string $envFile, string $resultsDir, array $overrides = [])
     {
         $this->resultsDir = $resultsDir;
         $this->loadEnv($envFile);
+        $this->applyOverrides($overrides);
         $this->timeout = (int) ($this->env['TEST_TIMEOUT'] ?? 10);
         $this->verbose = ($this->env['TEST_VERBOSE'] ?? 'true') === 'true';
     }
@@ -33,7 +34,7 @@ class SmtpTester
         $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) {
+            if ($line === '' || strpos($line, '#') === 0) {
                 continue;
             }
             if (strpos($line, '=') === false) {
@@ -46,6 +47,14 @@ class SmtpTester
             $value = trim($value, "\"'");
             $this->env[$key] = $value;
             $_ENV[$key] = $value;
+        }
+    }
+
+    private function applyOverrides(array $overrides): void
+    {
+        foreach ($overrides as $key => $value) {
+            $this->env[$key] = (string) $value;
+            $_ENV[$key] = (string) $value;
         }
     }
 
@@ -95,7 +104,7 @@ class SmtpTester
         $servers = $this->getServers();
         $this->results = [];
 
-        $this->header('RMS SMTP Connection Test Suite');
+        $this->header('MailBridge SMTP Connection Test Suite');
         $this->line('PHP ' . phpversion() . ' | ' . php_sapi_name());
         $this->line('Timeout: ' . $this->timeout . 's | Servers: ' . count($servers));
         $this->line('');
@@ -222,6 +231,8 @@ class SmtpTester
         $this->stepResult('AUTH Support', $hasAuth, $hasAuth ? implode(', ', $authMethods) : 'None advertised');
 
         // Step 6: STARTTLS (if tls requested and not already ssl)
+        $tlsRequired = ($config['encryption'] === 'tls');
+        $tlsOk = null;
         if ($config['encryption'] === 'tls' && $ehloOk) {
             $this->writeSmtpCommand($socket, 'STARTTLS');
             $tlsResp = $this->readSmtpResponse($socket);
@@ -241,21 +252,48 @@ class SmtpTester
             if ($tlsOk) {
                 // Re-EHLO after STARTTLS
                 $this->writeSmtpCommand($socket, "EHLO {$hostname}");
-                $this->readSmtpResponse($socket);
+                $postTlsEhlo = $this->readSmtpResponse($socket);
+
+                if ($postTlsEhlo !== false && (int) $postTlsEhlo['code'] === 250 && isset($postTlsEhlo['lines'])) {
+                    $authMethods = [];
+                    foreach ($postTlsEhlo['lines'] as $line) {
+                        if (preg_match('/AUTH\s+(.+)/i', $line, $m)) {
+                            $authMethods = array_merge($authMethods, preg_split('/\s+/', trim($m[1])));
+                        }
+                    }
+
+                    $hasAuth = !empty($authMethods);
+                    $result['steps']['auth_check'] = [
+                        'success' => $hasAuth,
+                        'detail'  => $hasAuth ? 'Methods after STARTTLS: ' . implode(', ', $authMethods) : 'No AUTH advertised after STARTTLS',
+                    ];
+                }
             }
         }
 
+        if ($tlsRequired && $tlsOk !== true) {
+            $result['error'] = 'STARTTLS/TLS handshake failed';
+            @fclose($socket);
+            $this->line('');
+
+            return $result;
+        }
+
         // Step 7: Authentication (if credentials provided)
-        if (!empty($config['username']) && !empty($config['password']) && $hasAuth) {
+        $authAttempted = false;
+        $authOk = null;
+        $credentialsProvided = !empty($config['username']) && !empty($config['password']);
+        if ($credentialsProvided && $hasAuth) {
+            $authAttempted = true;
             $this->writeSmtpCommand($socket, "AUTH LOGIN");
             $authResp = $this->readSmtpResponse($socket);
 
             if ($authResp !== false && (int) $authResp['code'] === 334) {
-                $this->writeSmtpCommand($socket, base64_encode($config['username']));
+                $this->writeSmtpCommand($socket, base64_encode($config['username']), true);
                 $userResp = $this->readSmtpResponse($socket);
 
                 if ($userResp !== false && (int) $userResp['code'] === 334) {
-                    $this->writeSmtpCommand($socket, base64_encode($config['password']));
+                    $this->writeSmtpCommand($socket, base64_encode($config['password']), true);
                     $passResp = $this->readSmtpResponse($socket);
                     $authOk = ($passResp !== false && (int) $passResp['code'] === 235);
                     $authDetail = $authOk ? 'Authenticated' : ($passResp['lines'][0] ?? 'Auth failed');
@@ -279,10 +317,22 @@ class SmtpTester
                 $result['error'] = "Authentication failed: {$authDetail}";
             }
         } else {
-            $this->stepResult('AUTH LOGIN', null, 'Skipped (no credentials or no AUTH support)');
+            if ($credentialsProvided) {
+                $authAttempted = true;
+                $authOk = false;
+                $result['steps']['auth_login'] = [
+                    'success' => false,
+                    'detail'  => 'Credentials provided but AUTH was not advertised',
+                ];
+                $result['error'] = $result['error'] ?? 'SMTP server did not advertise AUTH support';
+                $this->stepResult('AUTH LOGIN', false, 'AUTH not advertised');
+            } else {
+                $this->stepResult('AUTH LOGIN', null, 'Skipped (no credentials provided)');
+            }
         }
 
         // Step 8: Optional test email
+        $emailOk = null;
         if ($recipient !== null && !empty($config['from_email'])) {
             $emailOk = $this->sendTestEmail($socket, $config, $recipient);
             $result['steps']['test_email'] = [
@@ -290,14 +340,29 @@ class SmtpTester
                 'detail'  => $emailOk ? "Sent to {$recipient}" : 'Failed to send',
             ];
             $this->stepResult('Test Email', $emailOk, $emailOk ? "Sent to {$recipient}" : 'Failed');
+
+            if (!$emailOk && $result['error'] === null) {
+                $result['error'] = 'Test email failed to send';
+            }
+        } elseif ($recipient !== null) {
+            $emailOk = false;
+            $result['steps']['test_email'] = [
+                'success' => false,
+                'detail'  => 'Missing from_email configuration',
+            ];
+            $result['error'] = $result['error'] ?? 'Test email requested but from_email is not configured';
+            $this->stepResult('Test Email', false, 'Missing from_email configuration');
         }
 
         // QUIT
         $this->writeSmtpCommand($socket, 'QUIT');
         @fclose($socket);
 
-        // Determine overall success (connection + banner + EHLO minimum)
-        $result['success'] = $connOk && $bannerOk && $ehloOk;
+        // Determine overall success: connection + banner + EHLO, plus requested auth/email checks.
+        $tlsPassed = !$tlsRequired || $tlsOk === true;
+        $authPassed = !$authAttempted || $authOk === true;
+        $emailPassed = $recipient === null || $emailOk === true;
+        $result['success'] = $connOk && $bannerOk && $ehloOk && $tlsPassed && $authPassed && $emailPassed;
         if (!isset($result['error']) && !$result['success']) {
             $result['error'] = 'One or more SMTP handshake steps failed';
         }
@@ -332,11 +397,11 @@ class SmtpTester
 
         $body = "From: {$config['from_name']} <{$config['from_email']}>\r\n"
               . "To: {$recipient}\r\n"
-              . "Subject: RMS SMTP Test - Server {$config['host']}\r\n"
+              . "Subject: MailBridge SMTP Test - Server {$config['host']}\r\n"
               . "Date: " . date('r') . "\r\n"
               . "Message-ID: <" . md5(uniqid('', true)) . "@{$hostname}>\r\n"
               . "\r\n"
-              . "This is a test email from RMS SMTP CF7 test suite.\r\n"
+              . "This is a test email from the MailBridge SMTP test suite.\r\n"
               . "Server: {$config['host']}:{$config['port']}\r\n"
               . "Time: " . date('Y-m-d H:i:s') . "\r\n"
               . "\r\n";
@@ -347,11 +412,12 @@ class SmtpTester
         return ($resp !== false && (int) $resp['code'] === 250);
     }
 
-    private function writeSmtpCommand($socket, string $cmd): void
+    private function writeSmtpCommand($socket, string $cmd, bool $sensitive = false): void
     {
         fwrite($socket, $cmd . "\r\n");
-        if ($this->verbose && !str_contains($cmd, base64_encode(''))) {
-            $this->line("  >> {$cmd}");
+        if ($this->verbose) {
+            $display = $sensitive ? '[credentials hidden]' : $cmd;
+            $this->line("  >> {$display}");
         }
     }
 
@@ -397,11 +463,13 @@ class SmtpTester
 
     private function stepResult(string $step, ?bool $ok, string $detail): void
     {
-        $icon = match ($ok) {
-            true    => '[PASS]',
-            false   => '[FAIL]',
-            default => '[SKIP]',
-        };
+        if ($ok === true) {
+            $icon = '[PASS]';
+        } elseif ($ok === false) {
+            $icon = '[FAIL]';
+        } else {
+            $icon = '[SKIP]';
+        }
         $padded = str_pad("{$step}:", 16);
         $this->line("  {$icon} {$padded} {$detail}");
     }

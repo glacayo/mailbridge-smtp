@@ -13,7 +13,7 @@
  *   --verbose       Show SMTP protocol exchange
  *   --results-dir   Override results directory
  *
- * @package RMS_SMTP_CF7_Tests
+ * @package MailBridge_SMTP_Tests
  */
 
 // CLI only
@@ -67,22 +67,24 @@ foreach ($required as $ext) {
 // ─── Run tests ───────────────────────────────────────────────────
 
 try {
-    $tester = new SmtpTester($envFile, $resultsDir);
+    $envOverrides = [];
 
     // Override timeout if requested
     if ($overrideTimeout !== null) {
-        $_ENV['TEST_TIMEOUT'] = (int) $overrideTimeout;
+        $envOverrides['TEST_TIMEOUT'] = (string) (int) $overrideTimeout;
     }
 
     // Override verbose if requested
     if ($verbose) {
-        $_ENV['TEST_VERBOSE'] = 'true';
+        $envOverrides['TEST_VERBOSE'] = 'true';
     }
 
     // Filter to single server if requested
     if ($serverFilter !== null) {
-        $_ENV['TEST_SERVERS'] = (string) (int) $serverFilter;
+        $envOverrides['TEST_SERVERS'] = (string) (int) $serverFilter;
     }
+
+    $tester = new SmtpTester($envFile, $resultsDir, $envOverrides);
 
     // Determine recipient
     $recipient = $sendEmail ? ($tester->getEnv('TEST_RECIPIENT') ?: null) : null;

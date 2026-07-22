@@ -1,7 +1,7 @@
 /**
- * RMS SMTP for Contact Form 7 - Admin JavaScript
+ * MailBridge SMTP - Admin JavaScript
  *
- * @package RMS_SMTP_CF7
+ * @package MailBridge_SMTP
  * @version 1.0.0
  */
 
@@ -9,9 +9,9 @@
     'use strict';
 
     /**
-     * RMS SMTP CF7 Admin Class
+     * MailBridge SMTP Admin Class
      */
-    class RmsSmtpCf7Admin {
+    class MailBridgeSmtpAdmin {
         
         /**
          * Constructor
@@ -34,34 +34,34 @@
          */
         bindEvents() {
             // Test connection button
-            $('#rms_smtp_test_btn').on('click', (e) => this.testConnection(e));
+            $('#mailbridge_smtp_test_btn').on('click', (e) => this.testConnection(e));
             
             // Toggle authentication fields
-            $('#rms_smtp_auth').on('change', () => this.toggleAuthFields());
+            $('#mailbridge_smtp_auth').on('change', () => this.toggleAuthFields());
             
             // Toggle debug info
-            $('#rms_smtp_debug').on('change', () => this.toggleDebugInfo());
+            $('#mailbridge_smtp_debug').on('change', () => this.toggleDebugInfo());
             
             // Validate host on blur
-            $('#rms_smtp_host').on('blur', () => this.validateHost());
+            $('#mailbridge_smtp_host').on('blur', () => this.validateHost());
             
             // Validate port on change
-            $('#rms_smtp_port').on('change', () => this.validatePort());
+            $('#mailbridge_smtp_port').on('change', () => this.validatePort());
             
             // Warn about insecure settings
-            $('#rms_smtp_encryption').on('change', () => this.checkEncryption());
+            $('#mailbridge_smtp_encryption').on('change', () => this.checkEncryption());
 
             // Diagnostic test buttons
-            $('#rms_diagnostic_wp_btn').on('click', (e) => this.testDiagnostic(e, 'native_wp_mail'));
-            $('#rms_diagnostic_mail_btn').on('click', (e) => this.testDiagnostic(e, 'direct_mail'));
+            $('#mailbridge_diagnostic_wp_btn').on('click', (e) => this.testDiagnostic(e, 'native_wp_mail'));
+            $('#mailbridge_diagnostic_mail_btn').on('click', (e) => this.testDiagnostic(e, 'direct_mail'));
         }
         
         /**
          * Toggle authentication fields visibility
          */
         toggleAuthFields() {
-            const isChecked = $('#rms_smtp_auth').is(':checked');
-            const authFields = $('#rms_smtp_username, #rms_smtp_password').closest('tr');
+            const isChecked = $('#mailbridge_smtp_auth').is(':checked');
+            const authFields = $('#mailbridge_smtp_username, #mailbridge_smtp_password').closest('tr');
             
             if (isChecked) {
                 authFields.fadeIn(200);
@@ -74,14 +74,14 @@
          * Toggle debug mode information
          */
         toggleDebugInfo() {
-            const isChecked = $('#rms_smtp_debug').is(':checked');
+            const isChecked = $('#mailbridge_smtp_debug').is(':checked');
             const debugInfo = $('.debug-info');
             
             if (isChecked && debugInfo.length === 0) {
                 const warning = $('<div class="debug-info"><p>' + 
                     '<strong>Security Notice:</strong> Debug mode will log sensitive information. ' +
                     'Only enable this for testing and disable it in production.</p></div>');
-                $('#rms_smtp_debug').closest('td').append(warning);
+                $('#mailbridge_smtp_debug').closest('td').append(warning);
             } else if (!isChecked) {
                 debugInfo.remove();
             }
@@ -92,22 +92,33 @@
          * @return {boolean} Whether the host is valid
          */
         validateHost() {
-            const host = $('#rms_smtp_host').val().trim();
+            const host = $('#mailbridge_smtp_host').val().trim();
             const hostRegex = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-            const ipRegex = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
 
-            if (host === 'localhost') {
-                this.clearFieldError('rms_smtp_host');
+            if (host.toLowerCase() === 'localhost') {
+                this.clearFieldError('mailbridge_smtp_host');
                 return true;
             }
 
-            if (host && !hostRegex.test(host) && !ipRegex.test(host)) {
-                this.showFieldError('rms_smtp_host', 'Invalid host format. Please enter a valid domain or IP address.');
+            if (host && !hostRegex.test(host) && !this.isValidIpAddress(host)) {
+                this.showFieldError('mailbridge_smtp_host', 'Invalid host format. Please enter a valid domain or IP address.');
                 return false;
             }
             
-            this.clearFieldError('rms_smtp_host');
+            this.clearFieldError('mailbridge_smtp_host');
             return true;
+        }
+
+        /**
+         * Validate IPv4 and IPv6 host values, including private and reserved ranges.
+         * @param {string} host Host value to validate
+         * @return {boolean} Whether the host is a valid IP address
+         */
+        isValidIpAddress(host) {
+            const ipv4Regex = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+            const ipv6Regex = /^((?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}|(?:[a-fA-F0-9]{1,4}:){1,7}:|(?:[a-fA-F0-9]{1,4}:){1,6}:[a-fA-F0-9]{1,4}|(?:[a-fA-F0-9]{1,4}:){1,5}(?::[a-fA-F0-9]{1,4}){1,2}|(?:[a-fA-F0-9]{1,4}:){1,4}(?::[a-fA-F0-9]{1,4}){1,3}|(?:[a-fA-F0-9]{1,4}:){1,3}(?::[a-fA-F0-9]{1,4}){1,4}|(?:[a-fA-F0-9]{1,4}:){1,2}(?::[a-fA-F0-9]{1,4}){1,5}|[a-fA-F0-9]{1,4}:(?:(?::[a-fA-F0-9]{1,4}){1,6})|:(?:(?::[a-fA-F0-9]{1,4}){1,7}|:))$/;
+
+            return ipv4Regex.test(host) || ipv6Regex.test(host);
         }
         
         /**
@@ -115,14 +126,14 @@
          * @return {boolean} Whether the port is valid
          */
         validatePort() {
-            const port = parseInt($('#rms_smtp_port').val(), 10);
+            const port = parseInt($('#mailbridge_smtp_port').val(), 10);
             
             if (isNaN(port) || port < 1 || port > 65535) {
-                this.showFieldError('rms_smtp_port', 'Port must be between 1 and 65535.');
+                this.showFieldError('mailbridge_smtp_port', 'Port must be between 1 and 65535.');
                 return false;
             }
             
-            this.clearFieldError('rms_smtp_port');
+            this.clearFieldError('mailbridge_smtp_port');
             return true;
         }
         
@@ -130,7 +141,7 @@
          * Check encryption settings and warn about security
          */
         checkEncryption() {
-            const encryption = $('#rms_smtp_encryption').val();
+            const encryption = $('#mailbridge_smtp_encryption').val();
             const existingWarning = $('.encryption-warning');
             
             if (encryption === 'none') {
@@ -138,7 +149,7 @@
                 const warning = $('<div class="security-notice encryption-warning"><p>' +
                     '<strong>⚠️ Security Warning:</strong> No encryption means your SMTP credentials ' +
                     'will be sent in plain text. This is not recommended for production use.</p></div>');
-                $('#rms_smtp_encryption').closest('td').append(warning);
+                $('#mailbridge_smtp_encryption').closest('td').append(warning);
             } else {
                 existingWarning.remove();
             }
@@ -153,7 +164,7 @@
             const $field = $('#' + fieldId);
             this.clearFieldError(fieldId);
             $field.addClass('error');
-            $field.after($('<span class="rms-smtp-error">').text(message).css({color: '#dc3232', fontSize: '12px'}));
+            $field.after($('<span class="mailbridge-smtp-error">').text(message).css({color: '#dc3232', fontSize: '12px'}));
         }
         
         /**
@@ -163,7 +174,7 @@
         clearFieldError(fieldId) {
             const $field = $('#' + fieldId);
             $field.removeClass('error');
-            $field.siblings('.rms-smtp-error').remove();
+            $field.siblings('.mailbridge-smtp-error').remove();
         }
         
         /**
@@ -178,9 +189,9 @@
                 return;
             }
             
-            const $btn = $('#rms_smtp_test_btn');
-            const $result = $('#rms_smtp_test_result');
-            const testEmail = $('#rms_smtp_test_email').val().trim();
+            const $btn = $('#mailbridge_smtp_test_btn');
+            const $result = $('#mailbridge_smtp_test_result');
+            const testEmail = $('#mailbridge_smtp_test_email').val().trim();
             
             // Validate test email
             if (!this.isValidEmail(testEmail)) {
@@ -190,26 +201,26 @@
             
             // Disable button during test
             $btn.prop('disabled', true);
-            this.showResult('loading', rmsSmtpCf7.testing);
+            this.showResult('loading', mailbridgeSmtp.testing);
             
             // Make AJAX request
             $.ajax({
-                url: rmsSmtpCf7.ajaxurl,
+                url: mailbridgeSmtp.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'rms_smtp_cf7_test',
-                    nonce: rmsSmtpCf7.nonce,
+                    action: 'mailbridge_smtp_test',
+                    nonce: mailbridgeSmtp.nonce,
                     test_email: testEmail
                 },
                 success: (response) => {
                     if (response.success) {
-                        this.showResult('success', rmsSmtpCf7.success + ' ' + response.data);
+                        this.showResult('success', mailbridgeSmtp.success + ' ' + response.data);
                     } else {
-                        this.showResult('error', rmsSmtpCf7.error + ' ' + (response.data || ''));
+                        this.showResult('error', mailbridgeSmtp.error + ' ' + (response.data || ''));
                     }
                 },
                 error: (xhr, status, error) => {
-                    this.showResult('error', rmsSmtpCf7.error + ' (' + error + ')');
+                    this.showResult('error', mailbridgeSmtp.error + ' (' + error + ')');
                 },
                 complete: () => {
                     $btn.prop('disabled', false);
@@ -224,7 +235,7 @@
          * @param {jQuery} $result - Optional result element (defaults to SMTP test result)
          */
         showResult(type, message, $result) {
-            const $target = $result || $('#rms_smtp_test_result');
+            const $target = $result || $('#mailbridge_smtp_test_result');
             $target.removeClass('success error loading')
                    .addClass(type)
                    .text(message)
@@ -247,8 +258,8 @@
             e.preventDefault();
 
             const $btn = $(e.currentTarget);
-            const $result = $('#rms_diagnostic_result');
-            const testEmail = $('#rms_diagnostic_email').val().trim();
+            const $result = $('#mailbridge_diagnostic_result');
+            const testEmail = $('#mailbridge_diagnostic_email').val().trim();
 
             // Validate email
             if (!this.isValidEmail(testEmail)) {
@@ -258,15 +269,15 @@
 
             // Disable button during test
             $btn.prop('disabled', true);
-            this.showResult('loading', rmsSmtpCf7Diagnostic.testing, $result);
+            this.showResult('loading', mailbridgeSmtpDiagnostic.testing, $result);
 
             // Make AJAX request
             $.ajax({
-                url: rmsSmtpCf7Diagnostic.ajaxurl,
+                url: mailbridgeSmtpDiagnostic.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'rms_smtp_cf7_diagnostic',
-                    nonce: rmsSmtpCf7Diagnostic.nonce,
+                    action: 'mailbridge_smtp_diagnostic',
+                    nonce: mailbridgeSmtpDiagnostic.nonce,
                     test_type: testType,
                     test_email: testEmail
                 },
@@ -274,11 +285,11 @@
                     if (response.success) {
                         this.showResult('success', response.data, $result);
                     } else {
-                        this.showResult('error', response.data || rmsSmtpCf7Diagnostic.error, $result);
+                        this.showResult('error', response.data || mailbridgeSmtpDiagnostic.error, $result);
                     }
                 },
                 error: (xhr, status, error) => {
-                    this.showResult('error', rmsSmtpCf7Diagnostic.error + ' (' + error + ')', $result);
+                    this.showResult('error', mailbridgeSmtpDiagnostic.error + ' (' + error + ')', $result);
                 },
                 complete: () => {
                     $btn.prop('disabled', false);
@@ -299,10 +310,10 @@
     
     // Initialize when DOM is ready
     $(document).ready(() => {
-        new RmsSmtpCf7Admin();
+        new MailBridgeSmtpAdmin();
         
         // Initial checks
-        $('#rms_smtp_encryption').trigger('change');
+        $('#mailbridge_smtp_encryption').trigger('change');
     });
     
 })(jQuery);

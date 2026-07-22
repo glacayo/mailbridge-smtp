@@ -1,7 +1,7 @@
-# Skill Registry — RMS SMTP for Contact Form 7
+# Skill Registry — MailBridge SMTP
 
 **Generated**: 2026-04-06  
-**Project**: rms-smtp-cf7  
+**Project**: mailbridge-smtp
 **Purpose**: Catalog of available skills with compact rules for AI agent delegation
 
 ---
@@ -86,7 +86,7 @@ These skills implement the Spec-Driven Development workflow. They are automatica
 ### Root Files
 | File | Purpose |
 |------|---------|
-| rms-smtp-cf7-custom-plugin.php | Main plugin file (746 lines) |
+| mailbridge-smtp.php | Main plugin file |
 | README.md | Plugin documentation |
 | .gitignore | Git ignore rules (WordPress plugin standards) |
 | .atl/skill-registry.md | This file — skill catalog |

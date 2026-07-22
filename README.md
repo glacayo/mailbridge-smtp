@@ -1,88 +1,64 @@
-# RMS SMTP for Contact Form 7
+# MailBridge SMTP
 
-A secure WordPress plugin that enables SMTP email delivery for Contact Form 7 and all WordPress emails.
+MailBridge SMTP routes WordPress email through your SMTP provider. It applies to WordPress core mail, form plugins, ecommerce notifications, and any plugin that sends through `wp_mail()`.
 
 ## Features
 
-- **Secure SMTP Configuration**: Configure SMTP settings directly from the WordPress admin
-- **Contact Form 7 Integration**: Works seamlessly with CF7 email submissions
-- **Security First**: Encrypted password storage, input sanitization, nonce verification
-- **Easy Setup**: Simple configuration under Tools menu
-- **Test Connection**: Built-in SMTP connection testing
-- **Multiple Encryption Options**: Support for SSL/TLS encryption
-
-## Security Features
-
-This plugin implements multiple layers of security:
-
-### 1. **Encrypted Password Storage**
-- Passwords are encrypted using AES-256-GCM encryption
-- Encryption key derived from WordPress salts
-- Never stored in plain text
-
-### 2. **Input Validation & Sanitization**
-- Host validation: Only valid domain names and IP addresses
-- Port validation: Range 1-65535
-- Email validation: Proper email format checking
-- Text sanitization: All user inputs sanitized
-
-### 3. **Access Control**
-- Only administrators (`manage_options` capability) can access settings
-- Nonce verification on all AJAX requests
-- Capability checks on activation/deactivation
-
-### 4. **XSS Prevention**
-- All output properly escaped (`esc_attr`, `esc_html`, `esc_url`)
-- No direct echo of user input
-
-### 5. **CSRF Protection**
-- WordPress Settings API handles form nonces
-- Custom AJAX handlers verify nonces
+- **General WordPress SMTP**: Configure SMTP delivery for all WordPress emails.
+- **Form plugin friendly**: Works with form plugins that use `wp_mail()`.
+- **Security first**: Encrypted password storage, input sanitization, nonce verification, and capability checks.
+- **Easy setup**: Settings live under **Tools → MailBridge SMTP**.
+- **Built-in testing**: Send SMTP test emails and run mail diagnostics from the admin screen.
+- **Multiple encryption options**: Supports no encryption, SSL, and TLS.
 
 ## Installation
 
-1. Upload the `rms-smtp-cf7-custom-plugin` folder to `/wp-content/plugins/`
-2. Activate the plugin through the 'Plugins' menu in WordPress
-3. Navigate to **Tools → RMS SMTP** to configure settings
+1. Upload the `mailbridge-smtp` folder to `/wp-content/plugins/`.
+2. Activate **MailBridge SMTP** from the WordPress Plugins screen.
+3. Go to **Tools → MailBridge SMTP**.
+4. Enter your SMTP provider settings and save.
+5. Use **Send Test Email** to verify delivery.
 
 ## Configuration
 
-### SMTP Settings
-
 | Setting | Description | Example |
 |---------|-------------|---------|
-| **Enable SMTP** | Turn on SMTP for all emails | ☑️ |
+| **Enable SMTP** | Turn on SMTP for WordPress emails | ☑️ |
 | **SMTP Host** | Your SMTP server address | `smtp.gmail.com` |
-| **SMTP Port** | Server port (25, 465, 587) | `587` |
+| **SMTP Port** | Server port | `587` |
 | **Encryption** | Connection security | `TLS` |
 | **Authentication** | Enable SMTP login | ☑️ |
 | **Username** | SMTP account username | `user@example.com` |
-| **Password** | SMTP account password | •••••••• |
+| **Password** | SMTP account password or app password | •••••••• |
 | **From Email** | Sender email address | `noreply@example.com` |
 | **From Name** | Sender display name | `My Website` |
-| **Debug Mode** | Enable SMTP debugging | ☐ |
+| **Debug Mode** | Log SMTP debug output when WordPress debug logging is enabled | ☐ |
 
-### Common SMTP Providers
+## Common SMTP Providers
 
-#### Gmail
-```
+### Gmail
+
+```text
 Host: smtp.gmail.com
 Port: 587
 Encryption: TLS
 Authentication: Yes
 ```
-*Note: Requires App Password if 2FA is enabled*
 
-#### Outlook/Office 365
-```
+Gmail accounts with 2FA usually require an App Password.
+
+### Outlook / Microsoft 365
+
+```text
 Host: smtp.office365.com
 Port: 587
 Encryption: TLS
 Authentication: Yes
 ```
 
-#### SendGrid
-```
+### SendGrid
+
+```text
 Host: smtp.sendgrid.net
 Port: 587
 Encryption: TLS
@@ -91,55 +67,41 @@ Username: apikey
 Password: your_sendgrid_api_key
 ```
 
-## Usage with Contact Form 7
+## How it works with WordPress email
 
-This plugin automatically hooks into WordPress's `wp_mail()` function, which Contact Form 7 uses. No additional configuration needed in CF7 forms.
-
-1. Configure SMTP settings in **Tools → RMS SMTP**
-2. Your Contact Form 7 emails will now be sent via SMTP
-3. Use the "Send Test Email" feature to verify configuration
+MailBridge SMTP hooks into WordPress's `wp_mail()` flow. WordPress core, ecommerce extensions, form plugins, and many other tools use that same mail function, so no plugin-specific configuration is required.
 
 ## Testing
 
-### Admin Panel Testing
+### Admin panel testing
 
-1. Go to **Tools → RMS SMTP**
-2. Enter your email in the "Test Email Address" field
-3. Click "Send Test Email"
-4. Check your inbox for the test message
+1. Go to **Tools → MailBridge SMTP**.
+2. Enter an email address in **Test Email Address**.
+3. Click **Send Test Email**.
+4. Check the recipient inbox.
 
-### CLI SMTP Connection Test Suite
+### CLI SMTP connection tests
 
-The `tests/` directory contains a standalone test suite that validates SMTP connections **without WordPress**. Useful for diagnosing connectivity issues before activating the plugin.
-
-#### Setup
+The `tests/` directory contains a standalone CLI test suite that validates SMTP connections without loading WordPress. It is useful for diagnosing provider or network issues before configuring the plugin.
 
 ```bash
-# Copy the example env and fill in your credentials
+# Copy the local test env template and fill in credentials
 cp .env.example .env
 
-# Edit .env with your SMTP credentials (nano, vim, etc.)
-nano .env
-```
-
-#### Running Tests
-
-```bash
-# Test all configured servers (connection only)
+# Test all configured servers without sending email
 php tests/test-smtp-connection.php
 
-# Test with verbose SMTP protocol output
+# Show SMTP protocol output
 php tests/test-smtp-connection.php --verbose
 
-# Test a single server (e.g. server 1 = Gmail)
+# Test one configured server
 php tests/test-smtp-connection.php --server=1
 
-# Also send a test email (uses TEST_RECIPIENT from .env)
+# Send a test email using TEST_RECIPIENT from .env
 php tests/test-smtp-connection.php --send-email
-
-# Override timeout (default: 10s)
-php tests/test-smtp-connection.php --timeout=5
 ```
+
+Test results are saved as JSON files in `tests/results/`.
 
 #### What Each Test Checks
 
@@ -156,7 +118,7 @@ php tests/test-smtp-connection.php --timeout=5
 
 #### Test Results
 
-Results are saved as JSON in `tests/results/` with timestamps. Example:
+Results are saved as JSON in `tests/results/` with timestamps. Minimal example:
 
 ```json
 {
@@ -175,83 +137,42 @@ Results are saved as JSON in `tests/results/` with timestamps. Example:
 }
 ```
 
-#### Security Notes
+## Security notes
 
-- The test suite is **CLI-only** — it refuses to run in a web context
-- Passwords are **never echoed** in output
-- `.env` is in `.gitignore` — credentials are never committed
-- Only run tests in development/local environments
-
-## Debug Mode
-
-Enable debug mode to troubleshoot SMTP connection issues:
-
-1. Check "Enable SMTP Debug Mode"
-2. Save settings
-3. Check WordPress debug log (`wp-content/debug.log`) for SMTP connection details
-4. **Remember to disable debug mode in production!**
-
-## Troubleshooting
-
-### Emails Not Sending
-
-1. Verify SMTP is enabled
-2. Check host and port settings
-3. Ensure authentication credentials are correct
-4. Check if your hosting provider blocks SMTP ports
-5. Enable debug mode and check logs
-
-### Gmail Issues
-
-- If using Gmail with 2FA, generate an App Password:
-  1. Go to Google Account → Security
-  2. Enable 2-Step Verification if not already
-  3. Go to App Passwords
-  4. Generate password for "Mail"
-  5. Use this password in plugin settings
-
-### Connection Timeout
-
-- Try different ports: 465 (SSL) or 587 (TLS)
-- Check if your host blocks outgoing SMTP
-- Contact your hosting provider
+- SMTP passwords are encrypted using AES-256-GCM with keys derived from WordPress salts.
+- Admin actions require the `manage_options` capability.
+- AJAX requests use nonce verification.
+- `.env` is only for local CLI tests and should never be committed.
+- Release ZIP packages should exclude local-only files such as `tests/`, `.env`, and `.env.*`; keep `.distignore` aligned with release tooling.
+- Disable debug mode in production unless actively troubleshooting.
 
 ## Requirements
 
 - WordPress 5.8 or later
 - PHP 7.4 or later
-- Contact Form 7 (recommended but not required)
 
 ## Frequently Asked Questions
 
-### Does this work without Contact Form 7?
+### Which WordPress emails does this affect?
 
-Yes! This plugin configures SMTP for ALL WordPress emails, including:
-- WordPress core emails
-- WooCommerce notifications
-- Any plugin using `wp_mail()`
+MailBridge SMTP is a general WordPress SMTP plugin. It works with any email sent through `wp_mail()`, including WordPress core emails, ecommerce notifications, and form plugin submissions.
 
 ### Is my password secure?
 
-Yes. Passwords are encrypted using AES-256-GCM with keys derived from your WordPress salt keys. They are never stored in plain text.
+Passwords are encrypted before storage and are never intentionally displayed in plain text.
 
 ### Can I use this on multisite?
 
-This plugin is designed for single-site installations. Multisite support may be added in future versions.
+MailBridge SMTP is currently designed for single-site installations. Multisite support may be added in a future release.
 
 ## Support
 
-For issues, feature requests, or contributions:
-- GitHub: [https://github.com/glacayo/rms-smtp-cf7-custom-plugin](https://github.com/glacayo/rms-smtp-cf7-custom-plugin)
+For issues, feature requests, or contributions, use https://github.com/glacayo/mailbridge-smtp.
 
 ## License
 
 This plugin is licensed under the GPL-2.0-or-later license.
 
-## Credits
-
-Developed by RMS Development
-
 ---
 
-**Security Note**: Always use strong passwords and keep your WordPress installation updated. Enable SSL/TLS encryption for SMTP connections whenever possible.
+**Security note**: Use strong SMTP credentials and enable SSL/TLS encryption whenever possible.
