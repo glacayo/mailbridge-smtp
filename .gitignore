@@ -6,6 +6,8 @@
 *~
 
 # IDE
+.atl/
+.windsurf/
 .vscode/
 .idea/
 *.sublime-project
